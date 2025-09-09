@@ -1,4 +1,4 @@
-import { getCurrentPrice, getStockInfo } from '../services/stock.js';
+import { getCurrentStockPrice, getStockInfo } from '../services/stock.js';
 import logger from '../utils/logger.js';
 
 export const getPrice = async (req, res) => {
@@ -12,7 +12,7 @@ export const getPrice = async (req, res) => {
             });
         }
 
-        const price = await getCurrentPrice(symbol.toUpperCase());
+        const price = await getCurrentStockPrice(symbol.toUpperCase());
 
         res.json({
             success: true,

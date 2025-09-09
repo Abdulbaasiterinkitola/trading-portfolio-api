@@ -1,5 +1,6 @@
 import Portfolio from '../models/Portfolio.js';
 import logger from '../utils/logger.js';
+import { getCurrentStockPrice } from '../services/stock.js';
 
 export const addStock = async (req, res) => {
     try {
@@ -98,5 +99,109 @@ export const removeStock = async (req, res) => {
             success: false,
             message: 'Error removing stock from portfolio'
         });
+    }
+};
+
+export const getPortfolioSummary = async (req, res) => {
+    try {
+        const userId = req.user._id;
+        const holdings = await Portfolio.find({ userId });
+        
+        if (!holdings.length) {
+            return res.json({
+                success: true,
+                totalValue: 0,
+                totalInvested: 0,
+                profitLoss: 0,
+                positions: []
+            });
+        }
+
+        let totalValue = 0;
+        let totalInvested = 0;
+        
+        const positions = await Promise.all(holdings.map(async (holding) => {
+            try {
+                const currentPrice = await getCurrentStockPrice(holding.symbol);
+                const currentValue = holding.quantity * currentPrice;
+                const invested = holding.quantity * holding.purchasePrice;
+                const pnl = currentValue - invested;
+                
+                totalValue += currentValue;
+                totalInvested += invested;
+                
+                return {
+                    symbol: holding.symbol,
+                    quantity: holding.quantity,
+                    avgCost: holding.purchasePrice,
+                    currentPrice,
+                    currentValue,
+                    profitLoss: pnl,
+                    profitLossPercent: (pnl / invested) * 100
+                };
+            } catch (error) {
+                logger.error(`Error fetching price for ${holding.symbol}:`, error);
+                return null;
+            }
+        }));
+
+        const validPositions = positions.filter(position => position !== null);
+        const totalPnL = totalValue - totalInvested;
+
+        res.json({
+            success: true,
+            totalValue,
+            totalInvested,
+            profitLoss: totalPnL,
+            profitLossPercent: totalInvested > 0 ? (totalPnL / totalInvested) * 100 : 0,
+            positions: validPositions
+        });
+
+    } catch (error) {
+        logger.error('Portfolio summary error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error getting portfolio summary'
+        });
+    }
+};
+
+export const getDashboard = async (req, res) => {
+    try {
+        const userId = req.user._id;
+        const holdings = await Portfolio.find({ userId });
+        
+        if (!holdings.length) {
+            return res.json({
+                success: true,
+                message: "No stocks in portfolio",
+                totalValue: 0,
+                stockCount: 0
+            });
+        }
+
+        let totalValue = 0;
+        let totalInvested = 0;
+        
+        for (const holding of holdings) {
+            const currentPrice = await getCurrentStockPrice(holding.symbol);
+            const value = holding.quantity * currentPrice;
+            const invested = holding.quantity * holding.purchasePrice;
+            
+            totalValue += value;
+            totalInvested += invested;
+        }
+
+        res.json({
+            success: true,
+            totalValue,
+            totalInvested,
+            profitLoss: totalValue - totalInvested,
+            stockCount: holdings.length
+        });
+
+    } catch (error) {
+        logger.error('Dashboard error:', error);
+        res.status(500).json({ success: false, message: 'Error loading dashboard' });
     }
 };

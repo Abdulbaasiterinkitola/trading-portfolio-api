@@ -1,8 +1,7 @@
 import axios from "axios";
-import logger from "../utils/logger";
-import { ALPHA_VANTAGE_API_KEY } from "../config/env";
+import logger from "../utils/logger.js";
+import { ALPHA_VANTAGE_API_KEY } from "../config/env.js";
 
-const ALPHA_VANTAGE_API_KEY = {ALPHA_VANTAGE_API_KEY};
 const ALPHA_VANTAGE_BASE_URL = "https://www.alphavantage.co/query";
 
 const priceCache = new Map();
@@ -66,7 +65,7 @@ export const getStockInfo = async (symbol) => {
             return cached.data;
         }
 
-        const response = await axios.get(BASE_URL, {
+        const response = await axios.get(`${ALPHA_VANTAGE_BASE_URL}`, {
             params: {
                 function: 'OVERVIEW',
                 symbol: symbol,
@@ -94,6 +93,7 @@ export const getStockInfo = async (symbol) => {
             timestamp: Date.now()
         });
 
+        logger.info(`Fetched info for ${symbol}:`, stockInfo);
         return stockInfo;
 
     } catch (error) {
