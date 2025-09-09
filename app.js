@@ -4,6 +4,8 @@ import connectDB from './src/config/db.js';
 import logger from './src/utils/logger.js';
 import authRoutes from './src/routes/auth.js';
 import portfolioRoutes from './src/routes/portfolio.js';
+import stockRoutes from './src/routes/stock.js';
+
 import cors from 'cors';
 
 const app = express();
@@ -20,6 +22,7 @@ app.get('/api/test', (req, res) => {
 
 app.use('/api/auth', authRoutes);
 app.use('/api/portfolio', portfolioRoutes);
+app.use('/api/stocks', stockRoutes);
 
 // Start server after DB connection
 connectDB().then(() => {
