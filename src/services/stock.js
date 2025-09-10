@@ -25,18 +25,32 @@ export const getCurrentStockPrice = async (symbol) => {
       },
     });
 
+    // to debug: logger.error(`Raw Alpha Vantage response for ${symbol}:`, JSON.stringify(response.data, null, 2));
+
+    logger.debug(`Alpha Vantage response for ${symbol}:`, response.data);
+    
     const data = response.data;
 
     if (data[`Error Message`]) {
-      throw new Error(`Invalid symbol: ${symbol}`);
+        throw new Error(`Invalid symbol: ${symbol}`);
     }
 
     if (data[`Note`]) {
-      throw new Error("API call limit exceeded. Please try again later.");
+        const cached = priceCache.get(cacheKey);
+        if (cached) {
+            logger.warn(`Daily quota hit. Serving stale data for ${symbol}`);
+            return cached.price;
+        }
+        throw new Error("API call limit exceeded. Please try again later.");
     }
 
     const quote = data['Global Quote'];
         if (!quote || !quote['05. price']) {
+            const cached = priceCache.get(cacheKey);
+            if (cached) {
+                logger.warn(`Using cached price for ${symbol} due to API failure`);
+                return cached.price;
+            }
             throw new Error(`No price data for ${symbol}`);
         }
 
