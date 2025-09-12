@@ -1,0 +1,51 @@
+body {
+  font-family: Arial, sans-serif;
+  margin: 20px;
+  text-align: center;
+  background: #f4f4f4;
+}
+
+h1 {
+  margin-bottom: 20px;
+}
+
+.auth-box {
+  background: #fff;
+  padding: 15px;
+  margin: 10px auto;
+  width: 250px;
+  border-radius: 8px;
+  box-shadow: 0 0 5px rgba(0,0,0,0.2);
+}
+
+input {
+  display: block;
+  width: 90%;
+  margin: 8px auto;
+  padding: 8px;
+}
+
+button {
+  padding: 8px 15px;
+  cursor: pointer;
+}
+
+#status {
+  margin-top: 15px;
+  font-weight: bold;
+}
+
+.actions {
+  margin-top: 20px;
+}
+
+pre {
+  text-align: left;
+  background: #222;
+  color: #0f0;
+  padding: 10px;
+  border-radius: 6px;
+  max-width: 500px;
+  margin: 10px auto;
+  overflow-x: auto;
+}
