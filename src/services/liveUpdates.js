@@ -70,17 +70,6 @@ export const calculatePortfolioMetrics = async (userId) => {
     }
 };
 
-// Fetch all active symbols (optional helper)
-export const getActiveSymbols = async () => {
-    try {
-        const symbols = await Portfolio.distinct('symbol');
-        return symbols;
-    } catch (error) {
-        logger.error('Error fetching active symbols:', error);
-        return [];
-    }
-};
-
 // Start live portfolio updates via Socket.IO
 export const startLiveUpdates = () => {
     setInterval(async () => {

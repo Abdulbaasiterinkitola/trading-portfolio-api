@@ -1,33 +1,59 @@
 import Portfolio from '../models/Portfolio.js';
 import logger from '../utils/logger.js';
 import { calculatePortfolioMetrics } from '../services/liveUpdates.js';
+import { ALPHA_VANTAGE_API_KEY } from '../config/env.js';
 
-// Add or update a stock in the portfolio
+import axios from 'axios';
+
+const getCurrentStockPrice = async (symbol) => {
+    try {
+        const response = await axios.get(
+            `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${ALPHA_VANTAGE_API_KEY}`
+        );
+
+        const data = response.data['Global Quote'];
+        if (data && data['05. price']) {
+            return parseFloat(data['05. price']);
+        } else {
+            throw new Error(`Invalid stock symbol or no price data for ${symbol}`);
+        }
+    } catch (error) {
+        logger.error(`Error fetching price for ${symbol}:`, error);
+        throw new Error('Could not fetch stock price. Please try again later.');
+    }
+};
+
+// Add a stock to the portfolio
 export const addStock = async (req, res) => {
     try {
-        const { symbol, quantity, purchasePrice } = req.body;
+        const { symbol, quantity } = req.body;
         const userId = req.user._id;
+        if (!symbol || !quantity || quantity <= 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Symbol and only positive quantity are required'
+            });
+        }
+        const livePrice = await getCurrentStockPrice(symbol);
 
         let stock = await Portfolio.findOne({ userId, symbol });
 
         if (stock) {
-            // Update existing stock
             const totalQuantity = stock.quantity + quantity;
-            const totalValue = (stock.quantity * stock.purchasePrice) + (quantity * purchasePrice);
+            const totalValue = (stock.quantity * stock.purchasePrice) + (quantity * livePrice);
             stock.purchasePrice = totalValue / totalQuantity;
             stock.quantity = totalQuantity;
             await stock.save();
-
-            logger.info(`Updated stock ${symbol} for user ${req.user.username}`);
         } else {
-            // Add new stock
-            stock = new Portfolio({ userId, symbol, quantity, purchasePrice });
+            stock = new Portfolio({
+                userId,
+                symbol,
+                quantity,
+                purchasePrice: livePrice
+            });
             await stock.save();
-
-            logger.info(`Added stock ${symbol} for user ${req.user.username}`);
         }
 
-        // Return updated portfolio metrics
         const portfolioData = await calculatePortfolioMetrics(userId);
 
         res.status(201).json({
@@ -37,7 +63,6 @@ export const addStock = async (req, res) => {
             portfolio: portfolioData
         });
     } catch (error) {
-        logger.error('Add stock error:', error);
         res.status(500).json({
             success: false,
             message: 'Error adding stock to portfolio'
@@ -76,60 +101,6 @@ export const removeStock = async (req, res) => {
             success: false,
             message: 'Error removing stock from portfolio'
         });
-    }
-};
-
-// Get portfolio (returns live metrics)
-export const getPortfolio = async (req, res) => {
-    try {
-        const userId = req.user._id;
-        const portfolioData = await calculatePortfolioMetrics(userId);
-
-        res.json({
-            success: true,
-            portfolio: portfolioData
-        });
-    } catch (error) {
-        logger.error('Get portfolio error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Error fetching portfolio'
-        });
-    }
-};
-
-// Get portfolio summary
-export const getPortfolioSummary = async (req, res) => {
-    try {
-        const userId = req.user._id;
-        const portfolioData = await calculatePortfolioMetrics(userId);
-
-        res.json({
-            success: true,
-            ...portfolioData
-        });
-    } catch (error) {
-        logger.error('Portfolio summary error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Error getting portfolio summary'
-        });
-    }
-};
-
-// Get dashboard metrics
-export const getDashboard = async (req, res) => {
-    try {
-        const userId = req.user._id;
-        const portfolioData = await calculatePortfolioMetrics(userId);
-
-        res.json({
-            success: true,
-            ...portfolioData
-        });
-    } catch (error) {
-        logger.error('Dashboard error:', error);
-        res.status(500).json({ success: false, message: 'Error loading dashboard' });
     }
 };
 

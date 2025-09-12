@@ -2,6 +2,8 @@ import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import jwt from 'jsonwebtoken';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 import { PORT } from './src/config/env.js';
 import connectDB from './src/config/db.js';
@@ -42,6 +44,14 @@ app.use(async (req, res, next) => {
     }
 });
 
+// Serve frontend (public folder)
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+app.use(express.static(path.join(__dirname, 'public')));
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
 app.get('/api/test', (req, res) => {
     res.json({ message: "API is working!" });
 });
@@ -53,7 +63,7 @@ app.use('/api/stocks', stockRoutes);
 const httpServer = createServer(app);
 export const io = new Server(httpServer, {
     cors: {
-        origin: "http://localhost:3000",
+        origin: "*",
         methods: ["GET", "POST"],
         allowedHeaders: ["Content-Type"],
         credentials: true
