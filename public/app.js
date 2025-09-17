@@ -1,8 +1,11 @@
 const statusDiv = document.getElementById("status");
 const actionsDiv = document.querySelector(".actions");
-// const portfolioOutput = document.getElementById("portfolioOutput");
-// const dashboardOutput = document.getElementById("dashboardOutput");
 const liveOutput = document.getElementById("liveOutput");
+
+// ✅ Point to local backend if running locally, else Render backend
+const API_BASE_URL = window.location.hostname.includes("localhost") 
+  ? "http://localhost:3000"
+  : "https://portfolio-tracker-i9ca.onrender.com/";
 
 function showStatus(message, isError = false) {
   statusDiv.textContent = message;
@@ -13,11 +16,6 @@ function getToken() {
   return localStorage.getItem("token");
 }
 
-// --- API Base URL ---
-const API_BASE_URL = window.location.origin.includes("localhost")
-  ? "http://localhost:3000/api"
-  : "https://your-backend-service.onrender.com/api";
-
 // --- Register ---
 document.getElementById("registerForm").addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -26,7 +24,7 @@ document.getElementById("registerForm").addEventListener("submit", async (e) => 
   const password = document.getElementById("regPassword").value;
 
   try {
-    const res = await fetch(`${API_BASE_URL}/auth/register`, {
+    const res = await fetch(`${API_BASE_URL}/api/auth/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username, email, password }),
@@ -49,7 +47,7 @@ document.getElementById("loginForm").addEventListener("submit", async (e) => {
   const password = document.getElementById("loginPassword").value;
 
   try {
-    const res = await fetch(`${API_BASE_URL}/auth/login`, {
+    const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
@@ -59,9 +57,6 @@ document.getElementById("loginForm").addEventListener("submit", async (e) => {
       localStorage.setItem("token", data.token);
       showStatus("✅ Logged in successfully, token saved!");
       actionsDiv.style.display = "block";
-
-      // connect socket after login
-      connectSocket(data.token);
     } else {
       showStatus("❌ " + data.message, true);
     }
@@ -80,7 +75,7 @@ document.getElementById("addStockForm").addEventListener("submit", async (e) => 
   const quantity = parseInt(document.getElementById("stockQuantity").value, 10);
 
   try {
-    const res = await fetch(`${API_BASE_URL}/portfolio/stock`, {
+    const res = await fetch(`${API_BASE_URL}/api/portfolio/stock`, {
       method: "POST",
       headers: { 
         "Content-Type": "application/json",
@@ -104,7 +99,7 @@ document.getElementById("removeStockForm").addEventListener("submit", async (e) 
   const symbol = document.getElementById("removeSymbol").value;
 
   try {
-    const res = await fetch(`${API_BASE_URL}/portfolio/stock/${symbol}`, {
+    const res = await fetch(`${API_BASE_URL}/api/portfolio/stock/${symbol}`, {
       method: "DELETE",
       headers: { "Authorization": `Bearer ${token}` }
     });
@@ -121,7 +116,7 @@ document.getElementById("loadLive").addEventListener("click", async () => {
   if (!token) return showStatus("❌ You must login first", true);
 
   try {
-    const res = await fetch(`${API_BASE_URL}/portfolio/live`, {
+    const res = await fetch(`${API_BASE_URL}/api/portfolio/live`, {
       headers: { "Authorization": `Bearer ${token}` }
     });
     const data = await res.json();
@@ -131,30 +126,3 @@ document.getElementById("loadLive").addEventListener("click", async () => {
     showStatus("❌ Error fetching live portfolio", true);
   }
 });
-
-// --- Socket.IO setup ---
-function connectSocket(token) {
-  import("https://cdn.socket.io/4.7.2/socket.io.esm.min.js").then(({ io }) => {
-    const socket = io(API_BASE_URL.replace("/api", ""), {
-      auth: { token },
-      transports: ["websocket"]
-    });
-
-    socket.on("connect", () => {
-      console.log("Connected to Socket.IO server:", socket.id);
-    });
-
-    socket.on("error", (err) => {
-      console.error("Socket error:", err);
-    });
-
-    socket.on("portfolio_update", (update) => {
-      liveOutput.textContent = JSON.stringify(update, null, 2);
-      showStatus("📈 Live portfolio updated!");
-    });
-
-    socket.on("disconnect", () => {
-      console.log("Socket disconnected");
-    });
-  });
-}
