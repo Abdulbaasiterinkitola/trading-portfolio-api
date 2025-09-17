@@ -1,5 +1,7 @@
 const statusDiv = document.getElementById("status");
 const actionsDiv = document.querySelector(".actions");
+// const portfolioOutput = document.getElementById("portfolioOutput");
+// const dashboardOutput = document.getElementById("dashboardOutput");
 const liveOutput = document.getElementById("liveOutput");
 
 function showStatus(message, isError = false) {
@@ -10,6 +12,13 @@ function showStatus(message, isError = false) {
 function getToken() {
   return localStorage.getItem("token");
 }
+
+// --- API Base URL ---
+const API_BASE_URL = window.location.origin.includes("localhost")
+  ? "http://localhost:3000/api"
+  : "https://your-backend-service.onrender.com/api";
+
+// --- Register ---
 document.getElementById("registerForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const username = document.getElementById("regUsername").value;
@@ -17,7 +26,7 @@ document.getElementById("registerForm").addEventListener("submit", async (e) => 
   const password = document.getElementById("regPassword").value;
 
   try {
-    const res = await fetch("/api/auth/register", {
+    const res = await fetch(`${API_BASE_URL}/auth/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username, email, password }),
@@ -33,13 +42,14 @@ document.getElementById("registerForm").addEventListener("submit", async (e) => 
   }
 });
 
+// --- Login ---
 document.getElementById("loginForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const email = document.getElementById("loginEmail").value;
   const password = document.getElementById("loginPassword").value;
 
   try {
-    const res = await fetch("/api/auth/login", {
+    const res = await fetch(`${API_BASE_URL}/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
@@ -49,6 +59,9 @@ document.getElementById("loginForm").addEventListener("submit", async (e) => {
       localStorage.setItem("token", data.token);
       showStatus("✅ Logged in successfully, token saved!");
       actionsDiv.style.display = "block";
+
+      // connect socket after login
+      connectSocket(data.token);
     } else {
       showStatus("❌ " + data.message, true);
     }
@@ -57,6 +70,7 @@ document.getElementById("loginForm").addEventListener("submit", async (e) => {
   }
 });
 
+// --- Add Stock ---
 document.getElementById("addStockForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const token = getToken();
@@ -66,7 +80,7 @@ document.getElementById("addStockForm").addEventListener("submit", async (e) => 
   const quantity = parseInt(document.getElementById("stockQuantity").value, 10);
 
   try {
-    const res = await fetch("/api/portfolio/stock", {
+    const res = await fetch(`${API_BASE_URL}/portfolio/stock`, {
       method: "POST",
       headers: { 
         "Content-Type": "application/json",
@@ -81,6 +95,7 @@ document.getElementById("addStockForm").addEventListener("submit", async (e) => 
   }
 });
 
+// --- Remove Stock ---
 document.getElementById("removeStockForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const token = getToken();
@@ -89,7 +104,7 @@ document.getElementById("removeStockForm").addEventListener("submit", async (e) 
   const symbol = document.getElementById("removeSymbol").value;
 
   try {
-    const res = await fetch(`/api/portfolio/stock/${symbol}`, {
+    const res = await fetch(`${API_BASE_URL}/portfolio/stock/${symbol}`, {
       method: "DELETE",
       headers: { "Authorization": `Bearer ${token}` }
     });
@@ -100,71 +115,46 @@ document.getElementById("removeStockForm").addEventListener("submit", async (e) 
   }
 });
 
-
+// --- Live Portfolio ---
 document.getElementById("loadLive").addEventListener("click", async () => {
   const token = getToken();
   if (!token) return showStatus("❌ You must login first", true);
 
   try {
-    const res = await fetch("/api/portfolio/live", {
+    const res = await fetch(`${API_BASE_URL}/portfolio/live`, {
       headers: { "Authorization": `Bearer ${token}` }
     });
     const data = await res.json();
-    if (data.success) {
-      renderPortfolio(data);
-      showStatus("✅ Live portfolio loaded!");
-    } else {
-      liveOutput.innerHTML = `<p style="color:red;">❌ ${data.message}</p>`;
-    }
+    liveOutput.textContent = JSON.stringify(data, null, 2);
+    showStatus("✅ Live portfolio loaded!");
   } catch {
     showStatus("❌ Error fetching live portfolio", true);
   }
 });
 
-function renderPortfolio(portfolio) {
-  let html = `
-    <h3>Portfolio Summary</h3>
-    <p><strong>Total Value:</strong> $${portfolio.totalValue.toFixed(2)}</p>
-    <p><strong>Total Invested:</strong> $${portfolio.totalInvested.toFixed(2)}</p>
-    <p><strong>Profit/Loss:</strong> $${portfolio.profitLoss.toFixed(2)} (${portfolio.profitLossPercent.toFixed(2)}%)</p>
-    <p><strong>Stocks Count:</strong> ${portfolio.stockCount}</p>
-
-    <h3>Positions</h3>
-    <table border="1" cellpadding="6" cellspacing="0" style="border-collapse: collapse; margin-top:10px;">
-      <thead>
-        <tr style="background:#f0f0f0;">
-          <th>Symbol</th>
-          <th>Quantity</th>
-          <th>Avg Cost</th>
-          <th>Current Price</th>
-          <th>Investment Value</th>
-          <th>Current Value</th>
-          <th>P/L</th>
-          <th>P/L %</th>
-        </tr>
-      </thead>
-      <tbody>
-  `;
-
-  if (portfolio.positions && portfolio.positions.length > 0) {
-    portfolio.positions.forEach(p => {
-      html += `
-        <tr>
-          <td>${p.symbol}</td>
-          <td>${p.quantity}</td>
-          <td>$${p.avgCost.toFixed(2)}</td>
-          <td>$${p.currentPrice.toFixed(2)}</td>
-          <td>$${p.investmentValue.toFixed(2)}</td>
-          <td>$${p.currentValue.toFixed(2)}</td>
-          <td>$${p.profitLoss.toFixed(2)}</td>
-          <td>${p.profitLossPercent.toFixed(2)}%</td>
-        </tr>
-      `;
+// --- Socket.IO setup ---
+function connectSocket(token) {
+  import("https://cdn.socket.io/4.7.2/socket.io.esm.min.js").then(({ io }) => {
+    const socket = io(API_BASE_URL.replace("/api", ""), {
+      auth: { token },
+      transports: ["websocket"]
     });
-  } else {
-    html += `<tr><td colspan="8">No stocks yet</td></tr>`;
-  }
 
-  html += `</tbody></table>`;
-  liveOutput.innerHTML = html;
+    socket.on("connect", () => {
+      console.log("Connected to Socket.IO server:", socket.id);
+    });
+
+    socket.on("error", (err) => {
+      console.error("Socket error:", err);
+    });
+
+    socket.on("portfolio_update", (update) => {
+      liveOutput.textContent = JSON.stringify(update, null, 2);
+      showStatus("📈 Live portfolio updated!");
+    });
+
+    socket.on("disconnect", () => {
+      console.log("Socket disconnected");
+    });
+  });
 }
