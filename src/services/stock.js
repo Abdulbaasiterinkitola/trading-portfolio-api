@@ -10,6 +10,10 @@ const CACHE_DURATION = 60000;
 export const getCurrentStockPrice = async (symbol) => {
   const now = Date.now();
   try {
+    // Log environment details
+    logger.info(`🔍 DEBUG: Fetching ${symbol} with API key: ${ALPHA_VANTAGE_API_KEY ? 'Present' : 'MISSING'}`);
+    logger.info(`🔍 DEBUG: Environment: ${process.env.NODE_ENV}`);
+    
     const cacheKey = `price_${symbol}`;
     const cached = priceCache.get(cacheKey);
     if (cached && now - cached.timestamp < CACHE_DURATION) {
@@ -17,25 +21,32 @@ export const getCurrentStockPrice = async (symbol) => {
       return cached.price;
     }
 
+    const url = `${ALPHA_VANTAGE_BASE_URL}?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${ALPHA_VANTAGE_API_KEY}`;
+    logger.info(`🔍 DEBUG: Full URL: ${url}`);
+
     const response = await axios.get(ALPHA_VANTAGE_BASE_URL, {
       params: {
         function: "GLOBAL_QUOTE",
         symbol,
         apikey: ALPHA_VANTAGE_API_KEY,
       },
+      timeout: 10000 // 10 second timeout
     });
 
-    logger.error(`Raw Alpha Vantage response for ${symbol}:`, JSON.stringify(response.data, null, 2));
-
-    logger.debug(`Alpha Vantage response for ${symbol}:`, response.data);
-    
+    // Log the FULL response
+    logger.info(`🔍 DEBUG: Status: ${response.status}`);
+    logger.info(`🔍 DEBUG: Headers:`, response.headers);
+    logger.info(`🔍 DEBUG: Full Response Body:`, JSON.stringify(response.data, null, 2));
+   
     const data = response.data;
-
-    if (data[`Error Message`]) {
+    
+    // Check for specific Alpha Vantage error patterns
+    if (data['Error Message']) {
+        logger.error(`🔍 Alpha Vantage Error Message: ${data['Error Message']}`);
         throw new Error(`Invalid symbol: ${symbol}`);
     }
-
-    if (data[`Note`]) {
+    if (data['Note']) {
+        logger.error(`🔍 Alpha Vantage Note: ${data['Note']}`);
         const cached = priceCache.get(cacheKey);
         if (cached) {
             logger.warn(`Daily quota hit. Serving stale data for ${symbol}`);
@@ -43,27 +54,25 @@ export const getCurrentStockPrice = async (symbol) => {
         }
         throw new Error("API call limit exceeded. Please try again later.");
     }
-
+    
     const quote = data['Global Quote'];
-        if (!quote || !quote['05. price']) {
-            const cached = priceCache.get(cacheKey);
-            if (cached) {
-                logger.warn(`Using cached price for ${symbol} due to API failure`);
-                return cached.price;
-            }
-            throw new Error(`No price data for ${symbol}`);
+    if (!quote || !quote['05. price']) {
+        const cached = priceCache.get(cacheKey);
+        if (cached) {
+            logger.warn(`Using cached price for ${symbol} due to API failure`);
+            return cached.price;
         }
-
-        const price = parseFloat(quote['05. price']);
-
-        priceCache.set(cacheKey, {
-            price,
-            timestamp: now
-        });
-
-        logger.info(`Fetched price for ${symbol}: $${price}`);
-        return price;
-
+        throw new Error(`No price data for ${symbol}`);
+    }
+    
+    const price = parseFloat(quote['05. price']);
+    priceCache.set(cacheKey, {
+        price,
+        timestamp: now
+    });
+    logger.info(`Fetched price for ${symbol}: $${price}`);
+    return price;
+    
   } catch (error) {
     logger.error(`Error fetching stock price for ${symbol}: ${error.message}`);
     throw error;
