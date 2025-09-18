@@ -25,7 +25,7 @@ export const getCurrentStockPrice = async (symbol) => {
       },
     });
 
-    // to debug: logger.error(`Raw Alpha Vantage response for ${symbol}:`, JSON.stringify(response.data, null, 2));
+    logger.error(`Raw Alpha Vantage response for ${symbol}:`, JSON.stringify(response.data, null, 2));
 
     logger.debug(`Alpha Vantage response for ${symbol}:`, response.data);
     
