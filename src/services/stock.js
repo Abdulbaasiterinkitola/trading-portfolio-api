@@ -35,9 +35,18 @@ export const getCurrentStockPrice = async (symbol) => {
 
     // Log the FULL response
     logger.info(`🔍 DEBUG: Status: ${response.status}`);
-    logger.info(`🔍 DEBUG: Headers:`, response.headers);
-    logger.info(`🔍 DEBUG: Full Response Body:`, JSON.stringify(response.data, null, 2));
-   
+logger.info(`🔍 DEBUG: Response exists: ${!!response}`);
+logger.info(`🔍 DEBUG: Response.data exists: ${!!response.data}`);
+logger.info(`🔍 DEBUG: Response.data type: ${typeof response.data}`);
+logger.info(`🔍 DEBUG: Response.data length: ${JSON.stringify(response.data).length}`);
+logger.info(`🔍 DEBUG: Raw response.data:`, response.data);
+
+// If response.data is empty, log more details
+if (!response.data || Object.keys(response.data).length === 0) {
+    logger.error(`🔍 EMPTY RESPONSE for ${symbol}!`);
+    logger.info(`🔍 Response headers:`, JSON.stringify(response.headers, null, 2));
+    logger.info(`🔍 Request config:`, JSON.stringify(response.config, null, 2));
+}
     const data = response.data;
     
     // Check for specific Alpha Vantage error patterns
