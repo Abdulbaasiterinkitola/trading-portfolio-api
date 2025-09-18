@@ -47,6 +47,7 @@ if (!response.data || Object.keys(response.data).length === 0) {
     logger.info(`🔍 Response headers:`, JSON.stringify(response.headers, null, 2));
     logger.info(`🔍 Request config:`, JSON.stringify(response.config, null, 2));
 }
+
     const data = response.data;
     
     // Check for specific Alpha Vantage error patterns
